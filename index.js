@@ -106,19 +106,19 @@ async function loadMatches() {
   const matches = [];
 
   for (const m of fancode) {
-    // Prefer akamai_m3u8_hex: decode the hex-encoded HLS master playlist,
-    // write it to a temp file, and hand that path to the player.  The old
-    // dai_url (in-mc-flive.fancode.com) resets the connection.
+    // decode the hex-encoded HLS master playlist, and extract the highest
+    // quality direct stream URL. The old dai_url (in-mc-flive.fancode.com)
+    // resets the connection, and writing a local .m3u8 file breaks VLC's
+    // adaptive demuxer.
     let streamUrl = null;
     if (m.akamai_m3u8_hex) {
       try {
         const m3u8 = Buffer.from(m.akamai_m3u8_hex, 'hex').toString('utf-8');
-        const tmpFile = path.join(
-          os.tmpdir(),
-          `livesports-fancode-${m.match_id}.m3u8`
-        );
-        fs.writeFileSync(tmpFile, m3u8);
-        streamUrl = tmpFile;
+        const urls = m3u8.match(/^https?:\/\/.+/gm);
+        if (urls && urls.length > 0) {
+          // The highest resolution is usually the last one in the playlist
+          streamUrl = urls[urls.length - 1];
+        }
       } catch {
         // fall through to dai_url
       }
