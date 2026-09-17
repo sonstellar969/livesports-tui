@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * livesports-tui
+ * Description: Terminal UI for live/upcoming Fancode and SonyLiv streams, playable via mpv/VLC
+ * License: MIT
+ */
 import React, { useEffect, useState, useCallback } from 'react';
 import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
 import { spawn } from 'child_process';
