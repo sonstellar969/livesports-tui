@@ -82,13 +82,13 @@ const PLAYERS = [
   },
 ];
 
-function fetchBuffer(url) {
+function fetchBuffer(url, timeoutMs = 5000) {
   return new Promise((resolve) => {
     try {
       const client = url.startsWith('https') ? https : http;
       const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return resolve(fetchBuffer(res.headers.location));
+          return resolve(fetchBuffer(res.headers.location, timeoutMs));
         }
         if (res.statusCode < 200 || res.statusCode >= 300) {
           return resolve(null);
@@ -96,8 +96,13 @@ function fetchBuffer(url) {
         const chunks = [];
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', () => resolve(null));
       });
       req.on('error', () => resolve(null));
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        resolve(null);
+      });
     } catch {
       resolve(null);
     }
@@ -156,7 +161,11 @@ async function loadMatches() {
   }
 
   for (const m of sonyliv) {
-    const streamUrl = m.video_url || m.dai_url || null;
+    let streamUrl = m.video_url || m.dai_url || null;
+    if (streamUrl) {
+      streamUrl = streamUrl.replace('sonydaime.akamaized.net', 'liveakdai.slivcdn.com');
+      streamUrl = streamUrl.replace(/std_lrh-[^/?#]+\.m3u8/i, 'master.m3u8');
+    }
     let title = m.match_name || m.event_name || 'SonyLiv Event';
     if (m.event_name && m.match_name && !m.match_name.toLowerCase().includes(m.event_name.toLowerCase())) {
       title = `${m.event_name} · ${m.match_name}`;
@@ -261,12 +270,19 @@ function DetailPane({ match, imageWidthCols }) {
     if (!match) return undefined;
     setPoster(null);
     setLoading(true);
-    renderPoster(match.poster, imageWidthCols, IMAGE_HEIGHT_ROWS).then((rendered) => {
-      if (!cancelled) {
-        setPoster(rendered);
-        setLoading(false);
-      }
-    });
+    renderPoster(match.poster, imageWidthCols, IMAGE_HEIGHT_ROWS)
+      .then((rendered) => {
+        if (!cancelled) {
+          setPoster(rendered);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPoster(null);
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };
